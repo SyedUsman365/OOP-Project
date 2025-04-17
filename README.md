@@ -1,61 +1,94 @@
-# Car Racing Game Project Proposal
+# Invaders – A 2D Space Shooter Game
 
-## Project Overview
-The **Car Racing Game** is a 2D racing game developed in C++ using the **Raylib** graphics library. The game will feature a player-controlled car that must navigate through a dynamic race track while avoiding obstacles and competing against AI-controlled opponents. The goal is to reach the finish line as quickly as possible while collecting power-ups and avoiding crashes.
+## Introduction
+**Invaders** is a 2D arcade-style shooting game developed in **C++** using the **Raylib** graphics library. Inspired by the classic Space Invaders, the project aims to deliver a retro gaming experience while showcasing modern programming practices like object-oriented design and efficient graphics handling.
 
 ## Objectives
-- Develop a fast-paced racing game using **Raylib** in **C++**.
-- Implement realistic physics for car movement and collision detection.
-- Create a dynamic race track with various difficulty levels.
-- Integrate AI-controlled opponents for an engaging single-player experience.
-- Add power-ups and obstacles to enhance gameplay mechanics.
+- Implement a simple but engaging 2D shooter game.
+- Apply core C++ programming concepts such as classes, inheritance, and pointers.
+- Learn the basics of game development including game loops, user input handling, collision detection, and sprite management.
+- Gain practical experience with Raylib for game development.
+
+## Tools and Technologies Used
+| Tool/Technology | Purpose |
+|-----------------|---------|
+| C++ | Core programming language |
+| Raylib | Graphics, input, and sound handling |
+| Visual Studio Code / Code::Blocks | IDE for development |
+| Git & GitHub | Version control and collaboration |
+| Paint.net / Piskel | Custom 2D sprite design (optional) |
+
+## Gameplay
+- Control a spaceship at the bottom of the screen.
+- Shoot enemy invaders moving horizontally and descending when reaching screen edges.
+- Avoid enemy bullets and eliminate all enemies to win.
+- Game ends if the player loses all lives or clears all waves.
 
 ## Features
+- Player movement and shooting using keyboard input.
+- Multiple waves of enemies.
+- Collision detection for bullets and sprites.
+- Score tracking and a Game Over screen.
+- Basic sound effects and background music (optional).
 
-### 1. Core Gameplay
-- Player-controlled racing car with smooth controls.
-- AI-controlled opponents that react dynamically.
-- Lap-based system to track progress and time.
-- Speed boosts and power-ups to gain advantages.
+## Controls
+- **Arrow Keys**: Move left and right.
+- **Spacebar**: Fire bullets.
 
-### 2. Graphics and Visuals
-- 2D top-down view racing track.
-- Animated car sprites and visual effects.
-- Dynamic environment with changing backgrounds.
-- Particle effects for collisions and speed boosts.
+## Game Loop Structure
+1. **Initialize**: Set up window, load assets, initialize variables.
+2. **Update**: Handle input, update objects, detect collisions.
+3. **Draw**: Render all game elements on screen.
+4. **Unload**: Free resources and close the window.
 
-### 3. Physics and Controls
-- Smooth acceleration, braking, and drifting mechanics.
-- Realistic collision detection and response.
-- Keyboard and controller support for better player experience.
+## Implementation Highlights
+- Group enemy movement with edge detection and descent.
+- Bounding box collision detection.
+- UI elements like score display and Game Over menu.
+- Basic sound management (if implemented).
 
-### 4. Game Modes
-- **Single Race Mode**: Compete against AI opponents.
-- **Time Trial Mode**: Complete laps as fast as possible.
-- **Endless Mode**: Survive as long as possible while avoiding obstacles.
+## Testing and Debugging
+- Manual testing for all modules: movement, shooting, collision, and scoring.
+- Use of debug messages and Raylib's drawing functions during development.
+- Handling of edge cases (e.g., bullets leaving the screen, multiple bullets hitting enemies).
 
-### 5. Sound and Music
-- Background racing music for immersion.
-- Sound effects for engine revs, collisions, and power-ups.
+## Challenges Faced
+- Learning Raylib's structure and syntax.
+- Timing-based bullet firing and movement.
+- Precision and performance of collision detection.
+- Code organization for scalability.
 
-## Technology Stack
-- **Programming Language**: C++
-- **Graphics Library**: Raylib
-- **Physics Engine**: Custom physics logic
-- **Audio**: Raylib audio module
-- **IDE**: Visual Studio Code / CLion
+## Future Improvements
+- Add multiple player lives and health bar.
+- Introduce advanced enemy patterns and power-ups.
+- Save and display high scores.
+- Improve UI, animations, and polish.
+- Add levels and boss fights for progressive difficulty.
 
-## Development Timeline
-| Phase            | Tasks                                  | Duration  |
-|-----------------|---------------------------------------|----------|
-| Planning        | Define game mechanics & design UI     | 1 Week   |
-| Development     | Implement player controls & physics   | 3 Weeks  |
-| AI Development  | Create AI opponents & track behavior  | 2 Weeks  |
-| Graphics & UI   | Design sprites, track assets & UI     | 2 Weeks  |
-| Testing & Debugging | Optimize performance & fix bugs   | 2 Weeks  |
-| Finalization    | Sound integration & gameplay polish   | 1 Week   |
+## Conclusion
+The **Invaders** project successfully demonstrates the fundamentals of 2D game development using C++ and Raylib. It provided hands-on experience in handling graphics, user input, and implementing core game mechanics, serving as a solid foundation for more advanced projects in the future.
 
-## Expected Challenges
-- Implementing smooth car physics and handling.
-- Developing an intelligent AI opponent system.
-- Ensuring optimized performance for smooth gameplay.
+---
+
+## Setup and Running the Game
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/your-username/invaders-game.git
+    ```
+2. Navigate into the project directory:
+    ```bash
+    cd invaders-game
+    ```
+3. Compile the game using your preferred IDE (Visual Studio Code / Code::Blocks) with Raylib installed, or using g++:
+    ```bash
+    g++ main.cpp -o Invaders -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
+    ```
+4. Run the game:
+    ```bash
+    ./Invaders
+    ```
+
+## License
+This project is for educational purposes. Feel free to modify and improve it!
+
+---
