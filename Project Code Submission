@@ -1,0 +1,865 @@
+#include <SFML/Graphics.hpp>
+#include <SFML/System.hpp>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <random>
+#include <ctime>
+#include <memory>
+#include <sstream>
+
+constexpr int PLAYER_WIDTH = 50;
+constexpr int PLAYER_HEIGHT = 30;
+constexpr int ALIEN_WIDTH = 40;
+constexpr int ALIEN_HEIGHT = 30;
+constexpr int MYSTERY_SHIP_WIDTH = 60;
+constexpr int MYSTERY_SHIP_HEIGHT = 30;
+constexpr int FONT_SIZE = 24;
+constexpr int LARGE_FONT_SIZE = 34;
+
+class Laser
+{
+private:
+    sf::Vector2f position;
+    int speed;
+    bool active;
+
+public:
+    Laser(const sf::Vector2f& pos, int spd) : position(pos), speed(spd), active(true) {}
+
+    sf::FloatRect getRect() const
+    {
+        return { position.x, position.y, 4.0f, 15.0f };
+    }
+
+    void Update()
+    {
+        position.y += static_cast<float>(speed);
+        if (position.y > 700.0f - 100.0f || position.y < 25.0f)
+        {
+            active = false;
+        }
+    }
+
+    void Draw(sf::RenderWindow& window) const
+    {
+        if (active)
+        {
+            sf::RectangleShape rect(sf::Vector2f(4.0f, 15.0f));
+            rect.setPosition(position);
+            rect.setFillColor(sf::Color(243, 216, 63, 255));
+            window.draw(rect);
+        }
+    }
+
+    bool isActive() const { return active; }
+    void setActive(bool a) { active = a; }
+};
+
+class Spaceship
+{
+private:
+    sf::Texture image;
+    sf::Vector2f position;
+    sf::Clock fireClock;
+    float lastFireTime;
+    std::vector<std::unique_ptr<Laser>> lasers;
+
+public:
+    Spaceship() : lastFireTime(0.0f)
+    {
+        if (!image.loadFromFile("Shooter.png"))
+        {
+            std::cerr << "Failed to load spaceship image" << std::endl;
+            sf::Image placeholder;
+            placeholder.create(PLAYER_WIDTH, PLAYER_HEIGHT, sf::Color::Blue);
+            image.loadFromImage(placeholder);
+        }
+        position = { 100.0f, 100.0f };
+    }
+
+    sf::FloatRect getRec() const
+    {
+        return { position.x, position.y, static_cast<float>(PLAYER_WIDTH), static_cast<float>(PLAYER_HEIGHT) };
+    }
+
+    void reset(float windowWidth, float windowHeight)
+    {
+        position.x = (windowWidth - static_cast<float>(PLAYER_WIDTH)) / 2.0f;
+        position.y = windowHeight - static_cast<float>(PLAYER_HEIGHT) - 100.0f;
+        lasers.clear();
+    }
+
+    void Draw(sf::RenderWindow& window) const
+    {
+        sf::Sprite sprite(image);
+        sprite.setScale(
+            static_cast<float>(PLAYER_WIDTH) / image.getSize().x,
+            static_cast<float>(PLAYER_HEIGHT) / image.getSize().y);
+        sprite.setPosition(position);
+        window.draw(sprite);
+
+        for (const auto& laser : lasers)
+        {
+            if (laser->isActive())
+            {
+                laser->Draw(window);
+            }
+        }
+    }
+
+    void MoveLeft()
+    {
+        position.x -= 7.0f;
+        if (position.x < 25.0f)
+        {
+            position.x = 25.0f;
+        }
+    }
+
+    void MoveRight(float windowWidth)
+    {
+        position.x += 7.0f;
+        if (position.x > windowWidth - static_cast<float>(PLAYER_WIDTH) - 25.0f)
+        {
+            position.x = windowWidth - static_cast<float>(PLAYER_WIDTH) - 25.0f;
+        }
+    }
+
+    void FireLaser()
+    {
+        if (fireClock.getElapsedTime().asSeconds() - lastFireTime >= 0.35f)
+        {
+            lasers.emplace_back(std::make_unique<Laser>(
+                sf::Vector2f{ position.x + static_cast<float>(PLAYER_WIDTH) / 2.0f - 2.0f, position.y },
+                -6));
+            lastFireTime = fireClock.getElapsedTime().asSeconds();
+        }
+    }
+
+    std::vector<std::unique_ptr<Laser>>& getLasers() { return lasers; }
+};
+
+class Block
+{
+private:
+    sf::Vector2f position;
+
+public:
+    explicit Block(const sf::Vector2f& pos) : position(pos) {}
+
+    void Draw(sf::RenderWindow& window) const
+    {
+        sf::RectangleShape rect(sf::Vector2f(3.0f, 3.0f));
+        rect.setPosition(position);
+        rect.setFillColor(sf::Color(243, 216, 63, 255));
+        window.draw(rect);
+    }
+
+    sf::FloatRect getRect() const
+    {
+        return { position.x, position.y, 3.0f, 3.0f };
+    }
+};
+
+class Obstacle
+{
+public:
+    static std::vector<std::vector<int>> grid;
+    sf::Vector2f position;
+    std::vector<Block> blocks;
+
+    explicit Obstacle(const sf::Vector2f& pos) : position(pos)
+    {
+        for (size_t row = 0; row < grid.size(); ++row)
+        {
+            for (size_t column = 0; column < grid[0].size(); ++column)
+            {
+                if (grid[row][column] == 1)
+                {
+                    float pos_x = position.x + static_cast<float>(column) * 3.0f;
+                    float pos_y = position.y + static_cast<float>(row) * 3.0f;
+                    blocks.emplace_back(Block({ pos_x, pos_y }));
+                }
+            }
+        }
+    }
+
+    void Draw(sf::RenderWindow& window) const
+    {
+        for (const auto& block : blocks)
+        {
+            block.Draw(window);
+        }
+    }
+};
+
+std::vector<std::vector<int>> Obstacle::grid = {
+    {0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0},
+    {0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0},
+    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+    {0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1},
+};
+
+class Alien
+{
+public:
+    static sf::Texture alienImages[3];
+    int type;
+    sf::Vector2f position;
+
+    explicit Alien(int typ, const sf::Vector2f& pos) : type(typ), position(pos)
+    {
+        if (alienImages[type - 1].getNativeHandle() == 0)
+        {
+            switch (type)
+            {
+            case 1:
+                if (!alienImages[0].loadFromFile("alien_1.png"))
+                {
+                    std::cerr << "Failed to load alien_1 image" << std::endl;
+                    sf::Image placeholder;
+                    placeholder.create(ALIEN_WIDTH, ALIEN_HEIGHT, sf::Color::Green);
+                    alienImages[0].loadFromImage(placeholder);
+                }
+                break;
+            case 2:
+                if (!alienImages[1].loadFromFile("alien_2.png"))
+                {
+                    std::cerr << "Failed to load alien_2 image" << std::endl;
+                    sf::Image placeholder;
+                    placeholder.create(ALIEN_WIDTH, ALIEN_HEIGHT, sf::Color::Yellow);
+                    alienImages[1].loadFromImage(placeholder);
+                }
+                break;
+            case 3:
+                if (!alienImages[2].loadFromFile("alien_3.png"))
+                {
+                    std::cerr << "Failed to load alien_3 image" << std::endl;
+                    sf::Image placeholder;
+                    placeholder.create(ALIEN_WIDTH, ALIEN_HEIGHT, sf::Color::Red);
+                    alienImages[2].loadFromImage(placeholder);
+                }
+                break;
+            default:
+                if (!alienImages[0].loadFromFile("alien_1.png"))
+                {
+                    std::cerr << "Failed to load alien_1 image" << std::endl;
+                    sf::Image placeholder;
+                    placeholder.create(ALIEN_WIDTH, ALIEN_HEIGHT, sf::Color::Green);
+                    alienImages[0].loadFromImage(placeholder);
+                }
+                break;
+            }
+        }
+    }
+
+    sf::FloatRect getRect() const
+    {
+        return { position.x, position.y,
+               static_cast<float>(ALIEN_WIDTH),
+               static_cast<float>(ALIEN_HEIGHT) };
+    }
+
+    void Update(int direction)
+    {
+        position.x += static_cast<float>(direction);
+    }
+
+    void Draw(sf::RenderWindow& window) const
+    {
+        sf::Sprite sprite(alienImages[type - 1]);
+        sprite.setScale(
+            static_cast<float>(ALIEN_WIDTH) / alienImages[type - 1].getSize().x,
+            static_cast<float>(ALIEN_HEIGHT) / alienImages[type - 1].getSize().y);
+        sprite.setPosition(position);
+        window.draw(sprite);
+    }
+
+    static void UnloadImages()
+    {
+        for (auto& tex : alienImages)
+        {
+            tex.~Texture();
+        }
+    }
+};
+
+sf::Texture Alien::alienImages[3];
+
+class MysteryShip
+{
+private:
+    sf::Texture image;
+    sf::Vector2f position;
+    int speed;
+    bool alive;
+
+public:
+    MysteryShip() : speed(0), alive(false)
+    {
+        if (!image.loadFromFile("mystery.png"))
+        {
+            std::cerr << "Failed to load mystery ship image" << std::endl;
+            // Create placeholder
+            sf::Image placeholder;
+            placeholder.create(MYSTERY_SHIP_WIDTH, MYSTERY_SHIP_HEIGHT, sf::Color::Magenta);
+            image.loadFromImage(placeholder);
+        }
+    }
+
+    void Update(float windowWidth)
+    {
+        if (alive)
+        {
+            position.x += static_cast<float>(speed);
+            if (position.x > windowWidth - static_cast<float>(MYSTERY_SHIP_WIDTH) - 25.0f || position.x < 25.0f)
+            {
+                alive = false;
+            }
+        }
+    }
+
+    void Draw(sf::RenderWindow& window) const
+    {
+        if (alive)
+        {
+            sf::Sprite sprite(image);
+            sprite.setScale(
+                static_cast<float>(MYSTERY_SHIP_WIDTH) / image.getSize().x,
+                static_cast<float>(MYSTERY_SHIP_HEIGHT) / image.getSize().y);
+            sprite.setPosition(position);
+            window.draw(sprite);
+        }
+    }
+
+    void spawn(float windowWidth)
+    {
+        position.y = 90.0f;
+        int side = rand() % 2;
+
+        if (side == 0)
+        {
+            position.x = 25.0f;
+            speed = 3;
+        }
+        else
+        {
+            position.x = windowWidth - static_cast<float>(MYSTERY_SHIP_WIDTH) - 25.0f;
+            speed = -3;
+        }
+        alive = true;
+    }
+
+    sf::FloatRect getRect() const
+    {
+        if (alive)
+        {
+            return { position.x, position.y,
+                   static_cast<float>(MYSTERY_SHIP_WIDTH),
+                   static_cast<float>(MYSTERY_SHIP_HEIGHT) };
+        }
+        return { 0.0f, 0.0f, 0.0f, 0.0f };
+    }
+
+    bool isAlive() const { return alive; }
+    void setAlive(bool a) { alive = a; }
+};
+
+class Game
+{
+private:
+    Spaceship spaceship;
+    int aliensDirection;
+    constexpr static float alienLaserShootInterval = 0.35f;
+    float timeLastAlienFired;
+    MysteryShip mysteryShip;
+    float mysteryShipSpawnInterval;
+    float timeLastSpawn;
+    sf::Clock gameClock;
+    float windowWidth;
+    float windowHeight;
+    bool run;
+    int lives;
+    int score;
+    int highScore;
+    int level;
+    float alienSpeed;
+    std::vector<Obstacle> obstacles;
+    std::vector<Alien> aliens;
+    std::vector<std::unique_ptr<Laser>> alienLasers;
+    sf::Font font;
+
+    void GameOver()
+    {
+        run = false;
+    }
+
+    void reset()
+    {
+        spaceship.reset(windowWidth, windowHeight);
+        aliens.clear();
+        alienLasers.clear();
+        obstacles.clear();
+    }
+
+    void initGame()
+    {
+        if (!font.loadFromFile("arial.ttf"))
+        {
+            std::cerr << "Failed to load font" << std::endl;
+        }
+
+        obstacles = CreateObstacles();
+        aliens = CreateAliens();
+        aliensDirection = 1;
+        timeLastAlienFired = 0.0f;
+        mysteryShipSpawnInterval = static_cast<float>((rand() % 11) + 10);
+        timeLastSpawn = 0.0f;
+        score = 0;
+        level = 1;
+        alienSpeed = 1.0f;
+        highScore = LoadHighScoreFromFile();
+        lives = 3;
+        run = true;
+    }
+
+    void CheckForCollisions()
+    {
+        for (auto& laser : spaceship.getLasers())
+        {
+            if (!laser->isActive()) continue;
+
+            for (auto it = aliens.begin(); it != aliens.end();)
+            {
+                if (it->getRect().intersects(laser->getRect()))
+                {
+                    switch (it->type)
+                    {
+                    case 1: score += 100; break;
+                    case 2: score += 200; break;
+                    case 3: score += 300; break;
+                    }
+                    checkForHighScore();
+
+                    it = aliens.erase(it);
+                    laser->setActive(false);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            for (auto& obstacle : obstacles)
+            {
+                for (auto it = obstacle.blocks.begin(); it != obstacle.blocks.end();)
+                {
+                    if (it->getRect().intersects(laser->getRect()))
+                    {
+                        it = obstacle.blocks.erase(it);
+                        laser->setActive(false);
+                    }
+                    else
+                    {
+                        ++it;
+                    }
+                }
+            }
+
+            if (mysteryShip.getRect().intersects(laser->getRect()))
+            {
+                mysteryShip.setAlive(false);
+                laser->setActive(false);
+                score += 500;
+                checkForHighScore();
+            }
+        }
+
+        for (auto& laser : alienLasers)
+        {
+            if (!laser->isActive()) continue;
+
+            if (laser->getRect().intersects(spaceship.getRec()))
+            {
+                laser->setActive(false);
+                lives--;
+                if (lives <= 0)
+                {
+                    GameOver();
+                }
+            }
+
+            for (auto& obstacle : obstacles)
+            {
+                for (auto it = obstacle.blocks.begin(); it != obstacle.blocks.end();)
+                {
+                    if (it->getRect().intersects(laser->getRect()))
+                    {
+                        it = obstacle.blocks.erase(it);
+                        laser->setActive(false);
+                    }
+                    else
+                    {
+                        ++it;
+                    }
+                }
+            }
+        }
+
+        for (auto& alien : aliens)
+        {
+            for (auto& obstacle : obstacles)
+            {
+                for (auto it = obstacle.blocks.begin(); it != obstacle.blocks.end();)
+                {
+                    if (it->getRect().intersects(alien.getRect()))
+                    {
+                        it = obstacle.blocks.erase(it);
+                    }
+                    else
+                    {
+                        ++it;
+                    }
+                }
+            }
+
+            if (alien.getRect().intersects(spaceship.getRec()))
+            {
+                GameOver();
+            }
+        }
+    }
+
+    void MoveAliens()
+    {
+        for (auto& alien : aliens)
+        {
+            if (alien.position.x + static_cast<float>(ALIEN_WIDTH) > windowWidth - 25.0f)
+            {
+                aliensDirection = -1;
+                MoveDownAliens(15);
+            }
+            if (alien.position.x < 25.0f)
+            {
+                aliensDirection = 1;
+                MoveDownAliens(15);
+            }
+            alien.Update(aliensDirection * alienSpeed);
+        }
+    }
+
+    void MoveDownAliens(int distance)
+    {
+        for (auto& alien : aliens)
+        {
+            alien.position.y += static_cast<float>(distance);
+        }
+    }
+
+    void checkForHighScore()
+    {
+        if (score > highScore)
+        {
+            highScore = score;
+            saveHighScoreToFile(highScore);
+        }
+    }
+
+    static void saveHighScoreToFile(int highScore)
+    {
+        std::ofstream highScoreFile("highScore.txt");
+        if (highScoreFile.is_open())
+        {
+            highScoreFile << highScore;
+            highScoreFile.close();
+        }
+        else
+        {
+            std::cerr << "Failed to save highScore to File" << std::endl;
+        }
+    }
+
+    static int LoadHighScoreFromFile()
+    {
+        int loadedHighScore = 0;
+        std::ifstream highScoreFile("highScore.txt");
+        if (highScoreFile.is_open())
+        {
+            highScoreFile >> loadedHighScore;
+            highScoreFile.close();
+        }
+        else
+        {
+            std::cerr << "Failed to load highScore from File" << std::endl;
+        }
+        return loadedHighScore;
+    }
+
+    void AlienShootLaser()
+    {
+        float currentTime = gameClock.getElapsedTime().asSeconds();
+
+        if (currentTime - timeLastAlienFired >= alienLaserShootInterval && !aliens.empty())
+        {
+            size_t randomIndex = static_cast<size_t>(rand()) % aliens.size();
+            Alien& alien = aliens[randomIndex];
+            alienLasers.emplace_back(std::make_unique<Laser>(
+                sf::Vector2f{
+                    alien.position.x + static_cast<float>(ALIEN_WIDTH) / 2.0f,
+                    alien.position.y + static_cast<float>(ALIEN_HEIGHT)
+                },
+                6));
+            timeLastAlienFired = currentTime;
+        }
+    }
+
+    void DeleteInactiveLasers()
+    {
+        auto& playerLasers = spaceship.getLasers();
+        playerLasers.erase(
+            std::remove_if(playerLasers.begin(), playerLasers.end(),
+                [](const std::unique_ptr<Laser>& laser) { return !laser->isActive(); }),
+            playerLasers.end());
+
+        alienLasers.erase(
+            std::remove_if(alienLasers.begin(), alienLasers.end(),
+                [](const std::unique_ptr<Laser>& laser) { return !laser->isActive(); }),
+            alienLasers.end());
+    }
+
+    std::vector<Obstacle> CreateObstacles()
+    {
+        std::vector<Obstacle> newObstacles;
+        int obstacleWidth = static_cast<int>(Obstacle::grid[0].size()) * 3;
+        float gap = (windowWidth - (4.0f * static_cast<float>(obstacleWidth))) / 5.0f;
+
+        for (int i = 0; i < 4; i++)
+        {
+            float offsetX = (static_cast<float>(i) + 1.0f) * gap + static_cast<float>(i) * static_cast<float>(obstacleWidth);
+            newObstacles.emplace_back(Obstacle({ offsetX, windowHeight - 200.0f }));
+        }
+        return newObstacles;
+    }
+
+    std::vector<Alien> CreateAliens()
+    {
+        std::vector<Alien> newAliens;
+        for (int row = 0; row < 5; row++)
+        {
+            for (int column = 0; column < 11; column++)
+            {
+                int alienType;
+                if (row == 0)
+                {
+                    alienType = 3;
+                }
+                else if (row == 1 || row == 2)
+                {
+                    alienType = 2;
+                }
+                else
+                {
+                    alienType = 1;
+                }
+                float x = 75.0f + static_cast<float>(column) * 55.0f;
+                float y = 110.0f + static_cast<float>(row) * 55.0f;
+                newAliens.emplace_back(Alien(alienType, { x, y }));
+            }
+        }
+        return newAliens;
+    }
+
+    void NextLevel()
+    {
+        level++;
+        alienSpeed += 0.5f;
+        reset();
+        obstacles = CreateObstacles();
+        aliens = CreateAliens();
+    }
+
+public:
+    Game(float width, float height) :
+        windowWidth(width), windowHeight(height),
+        aliensDirection(1), timeLastAlienFired(0.0f),
+        mysteryShipSpawnInterval(0.0f), timeLastSpawn(0.0f),
+        run(false), lives(0), score(0), highScore(0), level(1), alienSpeed(1.0f)
+    {
+        srand(static_cast<unsigned int>(time(nullptr)));
+        initGame();
+    }
+
+    ~Game()
+    {
+        Alien::UnloadImages();
+    }
+
+    void Draw(sf::RenderWindow& window) const
+    {
+        spaceship.Draw(window);
+
+        for (const auto& obstacle : obstacles)
+        {
+            obstacle.Draw(window);
+        }
+
+        for (const auto& alien : aliens)
+        {
+            alien.Draw(window);
+        }
+
+        for (const auto& laser : alienLasers)
+        {
+            if (laser->isActive())
+            {
+                laser->Draw(window);
+            }
+        }
+
+        mysteryShip.Draw(window);
+
+        sf::Text text;
+        text.setFont(font);
+        text.setCharacterSize(FONT_SIZE);
+        text.setFillColor(sf::Color(243, 216, 63, 255));
+
+        text.setString("SCORE: " + std::to_string(score));
+        text.setPosition(20.0f, 10.0f);
+        window.draw(text);
+
+        text.setString("HIGH SCORE: " + std::to_string(highScore));
+        text.setPosition(windowWidth -300.0f, 10.0f);
+        window.draw(text);
+
+        text.setString("LIVES: " + std::to_string(lives));
+        text.setPosition(windowWidth / 2 - 50.0f, 10.0f);
+        window.draw(text);
+
+        text.setString("LEVEL: " + std::to_string(level));
+        text.setPosition(windowWidth / 2 - 50.0f, 40.0f);
+        window.draw(text);
+
+        if (!run)
+        {
+            sf::Text gameOverText;
+            gameOverText.setFont(font);
+            gameOverText.setCharacterSize(LARGE_FONT_SIZE);
+            gameOverText.setFillColor(sf::Color::Red);
+            gameOverText.setString("GAME OVER\nPress ENTER to restart");
+            gameOverText.setPosition(windowWidth / 2 - 150.0f, windowHeight / 2 - 50.0f);
+            window.draw(gameOverText);
+        }
+    }
+
+    void Update()
+    {
+        if (run)
+        {
+            float currentTime = gameClock.getElapsedTime().asSeconds();
+
+            if (currentTime - timeLastSpawn > mysteryShipSpawnInterval)
+            {
+                mysteryShip.spawn(windowWidth);
+                timeLastSpawn = currentTime;
+                mysteryShipSpawnInterval = static_cast<float>((rand() % 11) + 10);
+            }
+
+            for (auto& laser : spaceship.getLasers())
+            {
+                laser->Update();
+            }
+
+            for (auto& laser : alienLasers)
+            {
+                laser->Update();
+            }
+
+            MoveAliens();
+            AlienShootLaser();
+            DeleteInactiveLasers();
+            mysteryShip.Update(windowWidth);
+            CheckForCollisions();
+
+            if (aliens.empty())
+            {
+                NextLevel();
+            }
+        }
+    }
+
+    void HandleInput()
+    {
+        if (run)
+        {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+            {
+                spaceship.MoveLeft();
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+            {
+                spaceship.MoveRight(windowWidth);
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
+            {
+                spaceship.FireLaser();
+            }
+        }
+        else
+        {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
+            {
+                reset();
+                initGame();
+            }
+        }
+    }
+
+    int getScore() const { return score; }
+    int getHighScore() const { return highScore; }
+    int getLives() const { return lives; }
+    bool isRunning() const { return run; }
+};
+
+int main()
+{
+    const sf::Color grey(29, 29, 27, 255);
+    const sf::Color yellow(243, 216, 63, 255);
+    const int windowWidth = 750;
+    const int windowHeight = 700;
+
+    sf::RenderWindow window(sf::VideoMode(windowWidth, windowHeight), "Space Invaders");
+
+    window.setFramerateLimit(60);
+
+    Game game(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
+
+    while (window.isOpen())
+    {
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
+
+        game.HandleInput();
+        game.Update();
+
+        window.clear(grey);
+        game.Draw(window);
+        window.display();
+    }
+
+    return 0;
+}
