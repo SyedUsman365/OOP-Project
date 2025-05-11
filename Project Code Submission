@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
+#include <SFML/Audio.hpp>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -9,14 +10,16 @@
 #include <memory>
 #include <sstream>
 
-constexpr int PLAYER_WIDTH = 50;
-constexpr int PLAYER_HEIGHT = 30;
-constexpr int ALIEN_WIDTH = 40;
-constexpr int ALIEN_HEIGHT = 30;
-constexpr int MYSTERY_SHIP_WIDTH = 60;
-constexpr int MYSTERY_SHIP_HEIGHT = 30;
-constexpr int FONT_SIZE = 24;
-constexpr int LARGE_FONT_SIZE = 34;
+const int PLAYER_WIDTH = 50;
+const int PLAYER_HEIGHT = 30;
+const int ALIEN_WIDTH = 40;
+const int ALIEN_HEIGHT = 30;
+const int MYSTERY_SHIP_WIDTH = 60;
+const int MYSTERY_SHIP_HEIGHT = 30;
+const int FONT_SIZE = 24;
+const int LARGE_FONT_SIZE = 34;
+
+using namespace std;
 
 class Laser
 {
@@ -179,7 +182,7 @@ public:
                 if (grid[row][column] == 1)
                 {
                     float pos_x = position.x + static_cast<float>(column) * 3.0f;
-                    float pos_y = position.y + static_cast<float>(row) * 3.0f;
+                    float pos_y = position.y + static_cast<float>(row) * 3.0f;  
                     blocks.emplace_back(Block({ pos_x, pos_y }));
                 }
             }
@@ -842,6 +845,36 @@ int main()
 
     window.setFramerateLimit(60);
 
+    sf::Texture bgTexture;
+    if (!bgTexture.loadFromFile("bgImage2.jpg"))
+    {
+        cerr << "Error: There is an issue in your bgImage.jpg" << endl;
+        exit(1);
+    }
+    
+    sf::Sprite bgSprite;
+    bgSprite.setTexture(bgTexture);
+
+    sf::Vector2u windowSize = window.getSize();
+    sf::Vector2u textureSize = bgTexture.getSize();
+
+    float xScale = static_cast<float>(windowSize.x) / textureSize.x;
+    float yScale = static_cast<float>(windowSize.y) / textureSize.y;
+
+    bgSprite.setScale(xScale, yScale);
+
+    sf::SoundBuffer bgBuffer;
+    if (!bgBuffer.loadFromFile("bgMusic1.wav"))
+    {
+        cout << "Error: There is an issue in your bgMusic.wav file" << endl;
+        exit(1);
+    }
+
+    sf::Sound bgSound;
+    bgSound.setBuffer(bgBuffer);
+
+    bgSound.play();
+
     Game game(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
 
     while (window.isOpen())
@@ -856,10 +889,12 @@ int main()
         game.HandleInput();
         game.Update();
 
-        window.clear(grey);
+        window.clear();
+        window.draw(bgSprite);
         game.Draw(window);
         window.display();
     }
-
-    return 0;
+   
+    
+return 0;
 }
